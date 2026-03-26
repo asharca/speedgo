@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-	// Create a base context that can be used across the application
 	ctx := context.Background()
 
 	if len(os.Args) < 2 {
@@ -23,48 +22,73 @@ func main() {
 	switch cmd {
 	case "ping", "p":
 		if err := pingCommand(ctx, args); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "%s %v\n", core.Colorize(core.Red, "Error:"), err)
 			os.Exit(1)
 		}
 	case "download", "d":
 		if err := downloadCommand(ctx, args); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "%s %v\n", core.Colorize(core.Red, "Error:"), err)
 			os.Exit(1)
 		}
 	case "upload", "u":
 		if err := uploadCommand(ctx, args); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "%s %v\n", core.Colorize(core.Red, "Error:"), err)
 			os.Exit(1)
 		}
 	case "all", "a":
 		if err := allCommand(ctx, args); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "%s %v\n", core.Colorize(core.Red, "Error:"), err)
 			os.Exit(1)
 		}
-	case "-h", "--help":
+	case "-h", "--help", "help":
 		printHelp()
+	case "-v", "--version", "version":
+		fmt.Printf("%s %s\n", core.Colorize(core.Bold+core.Cyan, "SpeedGo"), core.Colorize(core.Dim, "v1.0.0"))
 	default:
-		fmt.Printf("Unknown command: %s\n\n", cmd)
+		fmt.Fprintf(os.Stderr, "%s unknown command: %s\n\n", core.Colorize(core.Red, "Error:"), cmd)
 		printHelp()
 		os.Exit(1)
 	}
 }
 
 func printHelp() {
-	fmt.Println("Usage: speedgo <command> [options]")
-	fmt.Println("\nCommands:")
-	fmt.Println("  ping, p        Test network latency (ping multiple targets)")
-	fmt.Println("  download, d    Test download speed")
-	fmt.Println("  upload, u      Test upload speed")
-	fmt.Println("  all, a         Run full speed test (ping + download + upload)")
-	fmt.Println("\nExamples:")
-	fmt.Println("  speedgo ping --region=cn                    # Ping Chinese servers")
-	fmt.Println("  speedgo ping --targets=google.com --count=5 # Ping custom target")
-	fmt.Println("  speedgo d --region=cn                       # Download test with CN servers")
-	fmt.Println("  speedgo d --region=global                   # Download test with global servers")
-	fmt.Println("  speedgo u --region=auto                     # Upload test (auto region)")
-	fmt.Println("\nHelp:")
-	fmt.Println("  speedgo <command> -h    Show help for a specific command")
+	c := core.Colorize
+	f := core.Colorf
+
+	fmt.Println()
+	fmt.Printf("  %s %s\n", c(core.Bold+core.Cyan, "SpeedGo"), c(core.Dim, "— Network speed test CLI"))
+	fmt.Println()
+
+	fmt.Printf("  %s\n", c(core.Bold, "USAGE"))
+	fmt.Printf("    %s %s %s\n",
+		c(core.White, "speedgo"),
+		c(core.Cyan, "<command>"),
+		c(core.Dim, "[options]"))
+	fmt.Println()
+
+	fmt.Printf("  %s\n", c(core.Bold, "COMMANDS"))
+	fmt.Printf("    %s  %s\n", f(core.Cyan, "%-14s", "all, a"), c(core.Dim, "Run full speed test (ping + download + upload)"))
+	fmt.Printf("    %s  %s\n", f(core.Cyan, "%-14s", "ping, p"), c(core.Dim, "Test network latency"))
+	fmt.Printf("    %s  %s\n", f(core.Cyan, "%-14s", "download, d"), c(core.Dim, "Test download speed"))
+	fmt.Printf("    %s  %s\n", f(core.Cyan, "%-14s", "upload, u"), c(core.Dim, "Test upload speed"))
+	fmt.Printf("    %s  %s\n", f(core.Cyan, "%-14s", "version"), c(core.Dim, "Show version"))
+	fmt.Println()
+
+	fmt.Printf("  %s\n", c(core.Bold, "OPTIONS"))
+	fmt.Printf("    %s  %s  %s\n",
+		f(core.Green, "%-14s", "--region"), c(core.Dim, "cn | global | auto"), c(core.Dim, "(default: auto)"))
+	fmt.Printf("    %s  %s\n",
+		f(core.Green, "%-14s", "--concurrency"), c(core.Dim, "Number of parallel streams (default: 2)"))
+	fmt.Printf("    %s  %s\n",
+		f(core.Green, "%-14s", "--verbose"), c(core.Dim, "Show detailed output"))
+	fmt.Println()
+
+	fmt.Printf("  %s\n", c(core.Bold, "EXAMPLES"))
+	fmt.Printf("    %s    %s\n", c(core.White, "speedgo all"), c(core.Dim, "# Full test, auto region"))
+	fmt.Printf("    %s    %s\n", c(core.White, "speedgo all --region=cn"), c(core.Dim, "# Full test, CN servers"))
+	fmt.Printf("    %s    %s\n", c(core.White, "speedgo d --region=global"), c(core.Dim, "# Download, global servers"))
+	fmt.Printf("    %s    %s\n", c(core.White, "speedgo ping --targets=google.com"), c(core.Dim, "# Ping custom target"))
+	fmt.Println()
 }
 
 func pingCommand(ctx context.Context, args []string) error {

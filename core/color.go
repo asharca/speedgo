@@ -33,3 +33,22 @@ func colorize(color, s string) string {
 func colorf(color, format string, a ...any) string {
 	return colorize(color, fmt.Sprintf(format, a...))
 }
+
+// Colorize is the exported version for use outside core package.
+func Colorize(color, s string) string { return colorize(color, s) }
+
+// Colorf is the exported version for use outside core package.
+func Colorf(color, format string, a ...any) string { return colorf(color, format, a...) }
+
+// Exported color constants for use outside core package.
+const (
+	Bold    = bold
+	Dim     = dim
+	Red     = red
+	Green   = green
+	Yellow  = yellow
+	Blue    = blue
+	Cyan    = cyan
+	White   = white
+	Magenta = magenta
+)
