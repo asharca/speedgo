@@ -20,13 +20,15 @@ type TestServer struct {
 // DownloadServers lists available download test endpoints.
 var DownloadServers = []TestServer{
 	// Global
-	{Name: "Cloudflare", URL: "https://speed.cloudflare.com/__down?bytes=25000000", Region: RegionGlobal, Provider: "Cloudflare"},
-	{Name: "OVH 100MB", URL: "https://proof.ovh.net/files/100Mb.dat", Region: RegionGlobal, Provider: "OVH"},
-	{Name: "Hetzner 100MB", URL: "https://speed.hetzner.de/100MB.bin", Region: RegionGlobal, Provider: "Hetzner"},
-	// China
-	{Name: "USTC Mirror", URL: "http://mirrors.ustc.edu.cn/ubuntu-releases/24.04/ubuntu-24.04.2-live-server-amd64.iso", Region: RegionCN, Provider: "USTC"},
-	{Name: "Tsinghua Mirror", URL: "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-releases/24.04/ubuntu-24.04.2-live-server-amd64.iso", Region: RegionCN, Provider: "Tsinghua"},
-	{Name: "Aliyun Mirror", URL: "https://mirrors.aliyun.com/ubuntu-releases/24.04/ubuntu-24.04.2-live-server-amd64.iso", Region: RegionCN, Provider: "Aliyun"},
+	{Name: "Cloudflare", URL: "https://speed.cloudflare.com/__down?bytes=100000000", Region: RegionGlobal, Provider: "Cloudflare"},
+	{Name: "OVH", URL: "https://proof.ovh.net/files/100Mb.dat", Region: RegionGlobal, Provider: "OVH"},
+	{Name: "Hetzner", URL: "https://speed.hetzner.de/100MB.bin", Region: RegionGlobal, Provider: "Hetzner"},
+	// China — Cloudflare has CN PoPs, reliable domestic CDN mirrors with large files
+	{Name: "Cloudflare CN", URL: "https://speed.cloudflare.com/__down?bytes=100000000", Region: RegionCN, Provider: "Cloudflare"},
+	{Name: "Aliyun", URL: "https://mirrors.aliyun.com/debian-cd/current/amd64/iso-cd/debian-12.9.0-amd64-netinst.iso", Region: RegionCN, Provider: "Aliyun"},
+	{Name: "Huawei Cloud", URL: "https://mirrors.huaweicloud.com/debian-cd/current/amd64/iso-cd/debian-12.9.0-amd64-netinst.iso", Region: RegionCN, Provider: "Huawei"},
+	{Name: "Tencent Cloud", URL: "https://mirrors.cloud.tencent.com/debian-cd/current/amd64/iso-cd/debian-12.9.0-amd64-netinst.iso", Region: RegionCN, Provider: "Tencent"},
+	{Name: "163 Mirror", URL: "https://mirrors.163.com/debian-cd/current/amd64/iso-cd/debian-12.9.0-amd64-netinst.iso", Region: RegionCN, Provider: "NetEase"},
 }
 
 // UploadServers lists available upload test endpoints.

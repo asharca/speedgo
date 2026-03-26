@@ -40,7 +40,7 @@ func TestDownloadChunk(t *testing.T) {
 	defer srv.Close()
 
 	bytesChan := make(chan int64, 100)
-	err := downloadChunk(context.Background(), srv.URL, bytesChan)
+	err := downloadChunk(context.Background(), http.DefaultClient, srv.URL, bytesChan)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestDownloadChunk_ServerError(t *testing.T) {
 	defer srv.Close()
 
 	bytesChan := make(chan int64, 100)
-	err := downloadChunk(context.Background(), srv.URL, bytesChan)
+	err := downloadChunk(context.Background(), http.DefaultClient, srv.URL, bytesChan)
 	// Server returns 500 but body is empty, so no error from reading
 	// This is fine - just verify it doesn't crash
 	_ = err
@@ -70,7 +70,7 @@ func TestDownloadChunk_ServerError(t *testing.T) {
 
 func TestDownloadChunk_InvalidURL(t *testing.T) {
 	bytesChan := make(chan int64, 100)
-	err := downloadChunk(context.Background(), "http://192.0.2.1:1/nope", bytesChan)
+	err := downloadChunk(context.Background(), http.DefaultClient, "http://192.0.2.1:1/nope", bytesChan)
 	if err == nil {
 		t.Error("expected error for unreachable URL")
 	}
@@ -87,7 +87,7 @@ func TestDownloadChunk_ContextCancelled(t *testing.T) {
 	cancel() // Cancel immediately
 
 	bytesChan := make(chan int64, 100)
-	err := downloadChunk(ctx, srv.URL, bytesChan)
+	err := downloadChunk(ctx, http.DefaultClient, srv.URL, bytesChan)
 	if err == nil {
 		t.Error("expected error for cancelled context")
 	}

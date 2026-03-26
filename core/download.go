@@ -126,6 +126,16 @@ func downloadWorker(ctx context.Context, id int, config *DownloadConfig,
 		return
 	}
 
+	client := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxConnsPerHost:     100,
+			IdleConnTimeout:     90 * time.Second,
+			DisableCompression:  true,
+			TLSHandshakeTimeout: 10 * time.Second,
+		},
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -133,7 +143,7 @@ func downloadWorker(ctx context.Context, id int, config *DownloadConfig,
 		default:
 			url := testFiles[id%len(testFiles)]
 
-			if err := downloadChunk(ctx, url, bytesChan); err != nil {
+			if err := downloadChunk(ctx, client, url, bytesChan); err != nil {
 				errChan <- fmt.Errorf("worker %d error: %w", id, err)
 				time.Sleep(time.Second)
 				continue
@@ -142,19 +152,19 @@ func downloadWorker(ctx context.Context, id int, config *DownloadConfig,
 	}
 }
 
-func downloadChunk(ctx context.Context, url string, bytesChan chan<- int64) error {
+func downloadChunk(ctx context.Context, client *http.Client, url string, bytesChan chan<- int64) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("making request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	buf := make([]byte, 32*1024) // 32KB buffer
+	buf := make([]byte, 128*1024) // 128KB buffer
 	for {
 		n, err := resp.Body.Read(buf)
 		if n > 0 {
