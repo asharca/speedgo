@@ -110,11 +110,19 @@ func measureDownloadSpeed(ctx context.Context, config *DownloadConfig) DownloadS
 			atomic.AddInt64(&totalBytes, bytes)
 
 		case err := <-errChan:
-			if err != nil {
+			if err != nil && !isContextDone(err) {
 				lastError = err
 			}
 		}
 	}
+}
+
+// isContextDone checks if an error is due to context cancellation/deadline,
+// which is expected when the test duration expires.
+func isContextDone(err error) bool {
+	s := err.Error()
+	return strings.Contains(s, context.DeadlineExceeded.Error()) ||
+		strings.Contains(s, context.Canceled.Error())
 }
 
 func downloadWorker(ctx context.Context, id int, config *DownloadConfig,

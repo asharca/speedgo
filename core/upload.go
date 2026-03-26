@@ -116,7 +116,7 @@ func measureUploadSpeed(ctx context.Context, config *UploadConfig, endpoint stri
 			atomic.AddInt64(&totalBytes, bytes)
 
 		case err := <-errChan:
-			if err != nil {
+			if err != nil && !isContextDone(err) {
 				lastError = err
 			}
 		}

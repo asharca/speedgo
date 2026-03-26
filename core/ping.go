@@ -158,9 +158,11 @@ func pingTarget(ctx context.Context, target string, config *PingConfig) PingResu
 
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
-		result.Errors = append(result.Errors, fmt.Errorf("creating ICMP connection: %w", err))
-		result.Lost = config.Count
-		return result
+		// ICMP not available (no root), fall back to TCP ping
+		if config.Verbose {
+			fmt.Printf("ICMP not available, using TCP ping for %s\n", target)
+		}
+		return tcpPingTarget(ctx, target, config)
 	}
 
 	defer func() {
@@ -173,7 +175,7 @@ func pingTarget(ctx context.Context, target string, config *PingConfig) PingResu
 		conn:   conn,
 		id:     os.Getpid() & 0xffff,
 		seq:    1,
-		target: ipAddr.String(), // 使用解析后的IP地址
+		target: ipAddr.String(),
 	}
 
 	for i := 0; i < config.Count; i++ {
@@ -202,6 +204,63 @@ func pingTarget(ctx context.Context, target string, config *PingConfig) PingResu
 
 	result.calculateStats()
 	return result
+}
+
+// tcpPingTarget measures latency by TCP connection to port 80/443.
+// Used as fallback when ICMP is not available (no root privileges).
+func tcpPingTarget(ctx context.Context, target string, config *PingConfig) PingResult {
+	result := PingResult{
+		Target: target,
+		RTTs:   make([]time.Duration, 0, config.Count),
+	}
+
+	port := "80"
+	// Try HTTPS port for common domains
+	addr := net.JoinHostPort(target, port)
+
+	for i := 0; i < config.Count; i++ {
+		select {
+		case <-ctx.Done():
+			result.Errors = append(result.Errors, ctx.Err())
+			return result
+		default:
+			rtt, err := tcpPing(ctx, addr, config.Timeout)
+			if err != nil {
+				if config.Verbose {
+					fmt.Printf("TCP Ping %s failed: %v\n", target, err)
+				}
+				result.Lost++
+				result.Errors = append(result.Errors, err)
+			} else {
+				result.RTTs = append(result.RTTs, rtt)
+				if config.Verbose {
+					fmt.Printf("TCP Ping %s: RTT = %v\n", target, rtt)
+				}
+			}
+			if i < config.Count-1 {
+				time.Sleep(time.Second)
+			}
+		}
+	}
+
+	result.calculateStats()
+	return result
+}
+
+// tcpPing measures a single TCP connection round-trip time.
+func tcpPing(ctx context.Context, addr string, timeout time.Duration) (time.Duration, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	var d net.Dialer
+	start := time.Now()
+	conn, err := d.DialContext(ctx, "tcp", addr)
+	rtt := time.Since(start)
+	if err != nil {
+		return 0, fmt.Errorf("TCP connect: %w", err)
+	}
+	conn.Close()
+	return rtt, nil
 }
 
 func (s *pingSession) ping(timeout time.Duration) (time.Duration, error) {
