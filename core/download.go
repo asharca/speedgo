@@ -18,7 +18,9 @@ import (
 type DownloadConfig struct {
 	Duration    time.Duration
 	Concurrency int
+	Region      Region
 	Verbose     bool
+	servers     []TestServer // selected servers after probe
 }
 
 // DownloadStats stores download speed statistics
@@ -29,11 +31,13 @@ type DownloadStats struct {
 	Error         error
 }
 
-// Default test files from various CDNs
-var defaultTestFiles = []string{
-	"https://speed.cloudflare.com/__down?bytes=25000000", // 25MB test file
-	"https://cdn.jsdelivr.net/gh/librespeed/speedtest-files@master/random4000x4000.jpg",
-	"https://proof.ovh.net/files/100Mb.dat",
+// getTestFiles returns download URLs from the selected servers.
+func getTestFiles(servers []TestServer) []string {
+	urls := make([]string, len(servers))
+	for i, s := range servers {
+		urls[i] = s.URL
+	}
+	return urls
 }
 
 func RunDownload(ctx context.Context, args []string) error {
@@ -42,8 +46,13 @@ func RunDownload(ctx context.Context, args []string) error {
 		return fmt.Errorf("parsing download config: %w", err)
 	}
 
-	fmt.Printf("Starting download speed test (Duration: %v, Concurrent streams: %d)\n",
-		config.Duration, config.Concurrency)
+	// Auto-select best servers by latency probe
+	candidates := GetDownloadServers(config.Region)
+	best := SelectBestServers(ctx, candidates, config.Concurrency)
+	config.servers = best
+
+	fmt.Printf("\nStarting download speed test (Duration: %v, Streams: %d, Region: %s)\n",
+		config.Duration, config.Concurrency, config.Region)
 
 	stats := measureDownloadSpeed(ctx, config)
 	printDownloadResults(stats)
@@ -73,25 +82,9 @@ func measureDownloadSpeed(ctx context.Context, config *DownloadConfig) DownloadS
 		}(i)
 	}
 
-	// Start progress monitoring in separate goroutine
-	go func() {
-		if config.Verbose {
-			ticker := time.NewTicker(time.Second)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					current := atomic.LoadInt64(&totalBytes)
-					duration := time.Since(start)
-					speed := float64(current*8) / (1000 * 1000 * duration.Seconds()) // Mbps
-					fmt.Printf("\rCurrent speed: %.2f Mbps", speed)
-				}
-			}
-		}
-	}()
+	// Start progress display
+	progress := NewProgress(&totalBytes, "Download")
+	defer progress.Stop()
 
 	// Collect results
 	go func() {
@@ -125,19 +118,24 @@ func measureDownloadSpeed(ctx context.Context, config *DownloadConfig) DownloadS
 }
 
 func downloadWorker(ctx context.Context, id int, config *DownloadConfig,
-	bytesChan chan<- int64, errChan chan<- error) {
+	bytesChan chan<- int64, errChan chan<- error,
+) {
+	testFiles := getTestFiles(config.servers)
+	if len(testFiles) == 0 {
+		errChan <- fmt.Errorf("worker %d: no download servers available for region %s", id, config.Region)
+		return
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			// Choose a random test file
-			url := defaultTestFiles[id%len(defaultTestFiles)]
+			url := testFiles[id%len(testFiles)]
 
 			if err := downloadChunk(ctx, url, bytesChan); err != nil {
 				errChan <- fmt.Errorf("worker %d error: %w", id, err)
-				time.Sleep(time.Second) // Back off on error
+				time.Sleep(time.Second)
 				continue
 			}
 		}
@@ -182,6 +180,7 @@ func parseDownloadConfig(args []string) (*DownloadConfig, error) {
 	return &DownloadConfig{
 		Duration:    cmd.Lookup("duration").Value.(flag.Getter).Get().(time.Duration),
 		Concurrency: cmd.Lookup("concurrency").Value.(flag.Getter).Get().(int),
+		Region:      Region(cmd.Lookup("region").Value.String()),
 		Verbose:     cmd.Lookup("verbose").Value.(flag.Getter).Get().(bool),
 	}, nil
 }
@@ -189,7 +188,7 @@ func parseDownloadConfig(args []string) (*DownloadConfig, error) {
 func printDownloadResults(stats DownloadStats) {
 	fmt.Printf("\n\nDOWNLOAD TEST RESULTS\n")
 	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("Total data received: %.2f MB\n", float64(stats.BytesReceived)/(1024*1024))
+	fmt.Printf("Total data received: %.2f MB\n", float64(stats.BytesReceived)/(1000*1000))
 	fmt.Printf("Test duration: %.1f seconds\n", stats.Duration.Seconds())
 	fmt.Printf("Average speed: %.2f Mbps\n", stats.Speed)
 	if stats.Error != nil {

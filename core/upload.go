@@ -19,6 +19,7 @@ import (
 type UploadConfig struct {
 	Duration    time.Duration
 	Concurrency int
+	Region      Region
 	Verbose     bool
 }
 
@@ -30,9 +31,17 @@ type UploadStats struct {
 }
 
 const (
-	uploadEndpoint = "https://speed.cloudflare.com/__up"
-	chunkSize      = 1 * 1024 * 1024 // 1MB chunks
+	chunkSize = 1 * 1024 * 1024 // 1MB chunks
 )
+
+// getUploadEndpoint returns the upload URL based on region.
+func getUploadEndpoint(region Region) string {
+	servers := GetUploadServers(region)
+	if len(servers) > 0 {
+		return servers[0].URL
+	}
+	return "https://speed.cloudflare.com/__up"
+}
 
 func RunUpload(ctx context.Context, args []string) error {
 	config, err := parseUploadConfig(args)
@@ -40,16 +49,21 @@ func RunUpload(ctx context.Context, args []string) error {
 		return fmt.Errorf("parsing upload config: %w", err)
 	}
 
-	fmt.Printf("Starting upload speed test (Duration: %v, Concurrent streams: %d)\n",
-		config.Duration, config.Concurrency)
+	// Auto-select best upload server
+	candidates := GetUploadServers(config.Region)
+	best := SelectBestServers(ctx, candidates, 1)
+	endpoint := best[0].URL
 
-	stats := measureUploadSpeed(ctx, config)
+	fmt.Printf("\nStarting upload speed test (Duration: %v, Streams: %d, Server: %s)\n",
+		config.Duration, config.Concurrency, best[0].Name)
+
+	stats := measureUploadSpeed(ctx, config, endpoint)
 	printUploadResults(stats)
 
 	return nil
 }
 
-func measureUploadSpeed(ctx context.Context, config *UploadConfig) UploadStats {
+func measureUploadSpeed(ctx context.Context, config *UploadConfig, endpoint string) UploadStats {
 	var totalBytes int64
 	start := time.Now()
 
@@ -70,29 +84,13 @@ func measureUploadSpeed(ctx context.Context, config *UploadConfig) UploadStats {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
-			uploadWorker(ctx, config, testData, bytesChan, errChan)
+			uploadWorker(ctx, config, endpoint, testData, bytesChan, errChan)
 		}(i)
 	}
 
-	// Start progress monitoring
-	go func() {
-		if config.Verbose {
-			ticker := time.NewTicker(time.Second)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					current := atomic.LoadInt64(&totalBytes)
-					duration := time.Since(start)
-					speed := float64(current*8) / (1000 * 1000 * duration.Seconds())
-					fmt.Printf("\rCurrent upload speed: %.2f Mbps", speed)
-				}
-			}
-		}
-	}()
+	// Start progress display
+	progress := NewProgress(&totalBytes, "Upload  ")
+	defer progress.Stop()
 
 	// Collect results
 	go func() {
@@ -125,7 +123,7 @@ func measureUploadSpeed(ctx context.Context, config *UploadConfig) UploadStats {
 	}
 }
 
-func uploadWorker(ctx context.Context, config *UploadConfig,
+func uploadWorker(ctx context.Context, _ *UploadConfig, endpoint string,
 	testData []byte, bytesChan chan<- int64, errChan chan<- error) {
 
 	client := &http.Client{
@@ -143,7 +141,7 @@ func uploadWorker(ctx context.Context, config *UploadConfig,
 		case <-ctx.Done():
 			return
 		default:
-			if err := uploadChunk(ctx, client, testData, bytesChan); err != nil {
+			if err := uploadChunk(ctx, client, endpoint, testData, bytesChan); err != nil {
 				errChan <- fmt.Errorf("upload error: %w", err)
 				time.Sleep(100 * time.Millisecond) // Short backoff on error
 				continue
@@ -152,13 +150,13 @@ func uploadWorker(ctx context.Context, config *UploadConfig,
 	}
 }
 
-func uploadChunk(ctx context.Context, client *http.Client, data []byte, bytesChan chan<- int64) error {
+func uploadChunk(ctx context.Context, client *http.Client, endpoint string, data []byte, bytesChan chan<- int64) error {
 	reader := &countingReader{
 		reader: bytes.NewReader(data),
 		count:  0,
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", uploadEndpoint, reader)
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, reader)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
@@ -215,6 +213,7 @@ func parseUploadConfig(args []string) (*UploadConfig, error) {
 	return &UploadConfig{
 		Duration:    time.Duration(duration) * time.Second,
 		Concurrency: cmd.Lookup("concurrency").Value.(flag.Getter).Get().(int),
+		Region:      Region(cmd.Lookup("region").Value.String()),
 		Verbose:     cmd.Lookup("verbose").Value.(flag.Getter).Get().(bool),
 	}, nil
 }
@@ -222,7 +221,7 @@ func parseUploadConfig(args []string) (*UploadConfig, error) {
 func printUploadResults(stats UploadStats) {
 	fmt.Printf("\n\nUPLOAD TEST RESULTS\n")
 	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("Total data sent: %.2f MB\n", float64(stats.BytesSent)/(1024*1024))
+	fmt.Printf("Total data sent: %.2f MB\n", float64(stats.BytesSent)/(1000*1000))
 	fmt.Printf("Test duration: %.1f seconds\n", stats.Duration.Seconds())
 	fmt.Printf("Average speed: %.2f Mbps\n", stats.Speed)
 	if stats.Error != nil {

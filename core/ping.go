@@ -23,6 +23,7 @@ type PingConfig struct {
 	Count       int
 	Timeout     time.Duration
 	Concurrency int
+	Region      Region
 	Verbose     bool
 }
 
@@ -84,9 +85,15 @@ func NewPingConfig(args []string) (*PingConfig, error) {
 	count := cmd.Lookup("count").Value.(flag.Getter).Get().(int)
 	timeout := cmd.Lookup("timeout").Value.(flag.Getter).Get().(time.Duration)
 	concurrency := cmd.Lookup("concurrency").Value.(flag.Getter).Get().(int)
+	region := Region(cmd.Lookup("region").Value.String())
 	verbose := cmd.Lookup("verbose").Value.(flag.Getter).Get().(bool)
 
-	targets := splitTargets(targetsStr)
+	var targets []string
+	if targetsStr != "" {
+		targets = splitTargets(targetsStr)
+	} else {
+		targets = GetPingTargets(region)
+	}
 	if len(targets) == 0 {
 		return nil, errors.New("no valid targets provided")
 	}
@@ -96,6 +103,7 @@ func NewPingConfig(args []string) (*PingConfig, error) {
 		Count:       count,
 		Timeout:     timeout,
 		Concurrency: concurrency,
+		Region:      region,
 		Verbose:     verbose,
 	}, nil
 }
