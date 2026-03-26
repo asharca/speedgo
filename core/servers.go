@@ -1,5 +1,14 @@
 package core
 
+import "net/http"
+
+const userAgent = "Mozilla/5.0 (compatible; SpeedGo/1.0)"
+
+// SetUA sets the User-Agent header on a request.
+func SetUA(req *http.Request) {
+	req.Header.Set("User-Agent", userAgent)
+}
+
 // Region represents a geographic region for server selection.
 type Region string
 
@@ -18,17 +27,15 @@ type TestServer struct {
 }
 
 // DownloadServers lists available download test endpoints.
+// All URLs verified with Go HTTP client (curl + go run) as of 2026-03.
+// Cloudflare __down removed: returns 403 due to WAF/TLS fingerprint detection.
 var DownloadServers = []TestServer{
-	// Global
-	{Name: "Cloudflare", URL: "https://speed.cloudflare.com/__down?bytes=100000000", Region: RegionGlobal, Provider: "Cloudflare"},
+	// Global — accessible from outside China; slow from CN but reachable
 	{Name: "OVH", URL: "https://proof.ovh.net/files/100Mb.dat", Region: RegionGlobal, Provider: "OVH"},
-	{Name: "Hetzner", URL: "https://speed.hetzner.de/100MB.bin", Region: RegionGlobal, Provider: "Hetzner"},
-	// China — Cloudflare has CN PoPs, reliable domestic CDN mirrors with large files
-	{Name: "Cloudflare CN", URL: "https://speed.cloudflare.com/__down?bytes=100000000", Region: RegionCN, Provider: "Cloudflare"},
-	{Name: "Aliyun", URL: "https://mirrors.aliyun.com/debian-cd/current/amd64/iso-cd/debian-12.9.0-amd64-netinst.iso", Region: RegionCN, Provider: "Aliyun"},
-	{Name: "Huawei Cloud", URL: "https://mirrors.huaweicloud.com/debian-cd/current/amd64/iso-cd/debian-12.9.0-amd64-netinst.iso", Region: RegionCN, Provider: "Huawei"},
-	{Name: "Tencent Cloud", URL: "https://mirrors.cloud.tencent.com/debian-cd/current/amd64/iso-cd/debian-12.9.0-amd64-netinst.iso", Region: RegionCN, Provider: "Tencent"},
-	{Name: "163 Mirror", URL: "https://mirrors.163.com/debian-cd/current/amd64/iso-cd/debian-12.9.0-amd64-netinst.iso", Region: RegionCN, Provider: "NetEase"},
+	// China — verified: no redirects, repeatable, Go HTTP client compatible
+	{Name: "Huawei Cloud", URL: "https://mirrors.huaweicloud.com/debian/dists/stable/main/Contents-amd64.gz", Region: RegionCN, Provider: "Huawei"},
+	{Name: "Aliyun", URL: "https://mirrors.aliyun.com/debian/dists/stable/main/Contents-amd64.gz", Region: RegionCN, Provider: "Aliyun"},
+	{Name: "Tencent Cloud", URL: "https://mirrors.cloud.tencent.com/debian/dists/stable/main/Contents-amd64.gz", Region: RegionCN, Provider: "Tencent"},
 }
 
 // UploadServers lists available upload test endpoints.

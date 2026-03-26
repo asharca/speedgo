@@ -157,6 +157,7 @@ func downloadChunk(ctx context.Context, client *http.Client, url string, bytesCh
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
+	SetUA(req)
 
 	resp, err := client.Do(req)
 	if err != nil {

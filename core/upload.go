@@ -161,6 +161,7 @@ func uploadChunk(ctx context.Context, client *http.Client, endpoint string, data
 		return fmt.Errorf("creating request: %w", err)
 	}
 
+	SetUA(req)
 	req.Header.Set("Content-Type", "application/octet-stream")
 	req.Header.Set("Content-Length", fmt.Sprint(len(data)))
 

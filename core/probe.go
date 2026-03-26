@@ -70,6 +70,7 @@ func probeLatency(ctx context.Context, rawURL string, timeout time.Duration) (ti
 	if err != nil {
 		return 0, err
 	}
+	SetUA(req)
 
 	client := &http.Client{
 		Timeout: timeout,
