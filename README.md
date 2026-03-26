@@ -14,13 +14,13 @@ A command-line network speed test tool written in Go, supporting both Chinese do
 ## Installation
 
 ```bash
-go install github.com/yourusername/speedgo@latest
+go install github.com/asharca/speedgo@latest
 ```
 
 Or build from source:
 
 ```bash
-git clone https://github.com/yourusername/speedgo.git
+git clone https://github.com/asharca/speedgo.git
 cd speedgo
 go build -o speedgo .
 ```

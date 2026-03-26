@@ -114,7 +114,9 @@ func RunPing(ctx context.Context, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Starting ping test to %d targets...\n", len(config.Targets))
+	fmt.Printf("\n  %s  %s\n",
+		colorize(bold+cyan, "Ping Test"),
+		colorf(dim, "%d targets", len(config.Targets)))
 	results := pingTargets(ctx, config)
 	printResults(results)
 	return nil
@@ -214,9 +216,7 @@ func tcpPingTarget(ctx context.Context, target string, config *PingConfig) PingR
 		RTTs:   make([]time.Duration, 0, config.Count),
 	}
 
-	port := "80"
-	// Try HTTPS port for common domains
-	addr := net.JoinHostPort(target, port)
+	addr := net.JoinHostPort(target, "443")
 
 	for i := 0; i < config.Count; i++ {
 		select {
@@ -351,44 +351,62 @@ func (r *PingResult) calculateStats() {
 	r.AvgRTT = total / time.Duration(len(r.RTTs))
 }
 
+func rttColor(ms float64) string {
+	switch {
+	case ms < 30:
+		return green
+	case ms < 100:
+		return yellow
+	default:
+		return red
+	}
+}
+
 func printResults(results []PingResult) {
-	fmt.Println("\nPING STATISTICS")
-	fmt.Println(strings.Repeat("=", 60))
-	fmt.Printf("%-20s %10s %10s %10s %12s\n", "TARGET", "MIN", "AVG", "MAX", "LOSS")
-	fmt.Println(strings.Repeat("-", 60))
+	fmt.Println()
+	fmt.Printf("  %s\n", colorize(bold, "LATENCY"))
+	fmt.Printf("  %s\n", colorize(dim, strings.Repeat("─", 62)))
+	fmt.Printf("  %-22s %10s %10s %10s %10s\n",
+		colorize(dim, "Target"), colorize(dim, "Min"), colorize(dim, "Avg"), colorize(dim, "Max"), colorize(dim, "Loss"))
+	fmt.Printf("  %s\n", colorize(dim, strings.Repeat("─", 62)))
 
 	for _, result := range results {
 		if len(result.RTTs) == 0 {
-			fmt.Printf("%-20s %10s %10s %10s %11d%%\n",
+			fmt.Printf("  %-22s %10s %10s %10s %10s\n",
 				result.Target,
-				"N/A",
-				"N/A",
-				"N/A",
-				100)
+				colorize(dim, "  ─"),
+				colorize(dim, "  ─"),
+				colorize(dim, "  ─"),
+				colorize(red, "100%"))
 
 			if len(result.Errors) > 0 {
-				fmt.Printf("  Errors:\n")
 				for _, err := range result.Errors {
-					fmt.Printf("  - %v\n", err)
+					fmt.Printf("    %s\n", colorf(dim, "%v", err))
 				}
 			}
 		} else {
 			lossPercent := float64(result.Lost) * 100 / float64(len(result.RTTs)+result.Lost)
-
-			// 格式化延迟值，统一使用毫秒为单位
 			_min := float64(result.MinRTT.Microseconds()) / 1000
 			_avg := float64(result.AvgRTT.Microseconds()) / 1000
 			_max := float64(result.MaxRTT.Microseconds()) / 1000
 
-			fmt.Printf("%-20s %9.1fms %9.1fms %9.1fms %10.1f%%\n",
-				result.Target,
-				_min,
-				_avg,
-				_max,
-				lossPercent)
+			lossColor := green
+			if lossPercent > 0 {
+				lossColor = yellow
+			}
+			if lossPercent > 10 {
+				lossColor = red
+			}
+
+			fmt.Printf("  %-22s %s %s %s %s\n",
+				colorize(white, result.Target),
+				colorf(rttColor(_min), "%8.1fms", _min),
+				colorf(rttColor(_avg), "%8.1fms", _avg),
+				colorf(rttColor(_max), "%8.1fms", _max),
+				colorf(lossColor, "%8.1f%%", lossPercent))
 		}
 	}
-	fmt.Println(strings.Repeat("=", 60))
+	fmt.Printf("  %s\n", colorize(dim, strings.Repeat("─", 62)))
 }
 
 const protocolICMP = 1

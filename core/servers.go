@@ -29,9 +29,11 @@ type TestServer struct {
 // DownloadServers lists available download test endpoints.
 // All URLs verified with Go HTTP client (curl + go run) as of 2026-03.
 // Cloudflare __down removed: returns 403 due to WAF/TLS fingerprint detection.
+// OVH removed: TLS handshake timeout from CN, only 1.4 Mbps.
 var DownloadServers = []TestServer{
-	// Global — accessible from outside China; slow from CN but reachable
-	{Name: "OVH", URL: "https://proof.ovh.net/files/100Mb.dat", Region: RegionGlobal, Provider: "OVH"},
+	// Global — GitHub/Go CDN, accessible worldwide including from CN
+	{Name: "Go CDN", URL: "https://go.dev/dl/go1.23.0.linux-amd64.tar.gz", Region: RegionGlobal, Provider: "Google"},
+	{Name: "GitHub Release", URL: "https://github.com/cli/cli/releases/download/v2.67.0/gh_2.67.0_linux_amd64.tar.gz", Region: RegionGlobal, Provider: "GitHub"},
 	// China — verified: no redirects, repeatable, Go HTTP client compatible
 	{Name: "Huawei Cloud", URL: "https://mirrors.huaweicloud.com/debian/dists/stable/main/Contents-amd64.gz", Region: RegionCN, Provider: "Huawei"},
 	{Name: "Aliyun", URL: "https://mirrors.aliyun.com/debian/dists/stable/main/Contents-amd64.gz", Region: RegionCN, Provider: "Aliyun"},
@@ -56,7 +58,7 @@ var PingTargets = map[Region][]string{
 	RegionCN: {
 		"baidu.com",
 		"aliyun.com",
-		"tencent.com",
+		"cloud.tencent.com",
 		"qq.com",
 		"bilibili.com",
 	},

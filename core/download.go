@@ -51,8 +51,9 @@ func RunDownload(ctx context.Context, args []string) error {
 	best := SelectBestServers(ctx, candidates, config.Concurrency)
 	config.servers = best
 
-	fmt.Printf("\nStarting download speed test (Duration: %v, Streams: %d, Region: %s)\n",
-		config.Duration, config.Concurrency, config.Region)
+	fmt.Printf("\n  %s  %s\n",
+		colorize(bold+cyan, "Download Speed Test"),
+		colorf(dim, "duration=%v streams=%d region=%s", config.Duration, config.Concurrency, config.Region))
 
 	stats := measureDownloadSpeed(ctx, config)
 	printDownloadResults(stats)
@@ -205,13 +206,12 @@ func parseDownloadConfig(args []string) (*DownloadConfig, error) {
 }
 
 func printDownloadResults(stats DownloadStats) {
-	fmt.Printf("\n\nDOWNLOAD TEST RESULTS\n")
-	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("Total data received: %.2f MB\n", float64(stats.BytesReceived)/(1000*1000))
-	fmt.Printf("Test duration: %.1f seconds\n", stats.Duration.Seconds())
-	fmt.Printf("Average speed: %.2f Mbps\n", stats.Speed)
+	fmt.Println()
+	fmt.Printf("  %s  %s  %s\n",
+		colorize(bold, "Download"),
+		colorf(bold+green, "%.2f Mbps", stats.Speed),
+		colorf(dim, "(%.1f MB in %.1fs)", float64(stats.BytesReceived)/(1000*1000), stats.Duration.Seconds()))
 	if stats.Error != nil {
-		fmt.Printf("Errors encountered: %v\n", stats.Error)
+		fmt.Printf("  %s %v\n", colorize(yellow, "!"), stats.Error)
 	}
-	fmt.Println(strings.Repeat("=", 50))
 }

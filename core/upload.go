@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"speedgo/commands"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -54,8 +53,9 @@ func RunUpload(ctx context.Context, args []string) error {
 	best := SelectBestServers(ctx, candidates, 1)
 	endpoint := best[0].URL
 
-	fmt.Printf("\nStarting upload speed test (Duration: %v, Streams: %d, Server: %s)\n",
-		config.Duration, config.Concurrency, best[0].Name)
+	fmt.Printf("\n  %s  %s\n",
+		colorize(bold+cyan, "Upload Speed Test"),
+		colorf(dim, "duration=%v streams=%d server=%s", config.Duration, config.Concurrency, best[0].Name))
 
 	stats := measureUploadSpeed(ctx, config, endpoint)
 	printUploadResults(stats)
@@ -220,13 +220,12 @@ func parseUploadConfig(args []string) (*UploadConfig, error) {
 }
 
 func printUploadResults(stats UploadStats) {
-	fmt.Printf("\n\nUPLOAD TEST RESULTS\n")
-	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("Total data sent: %.2f MB\n", float64(stats.BytesSent)/(1000*1000))
-	fmt.Printf("Test duration: %.1f seconds\n", stats.Duration.Seconds())
-	fmt.Printf("Average speed: %.2f Mbps\n", stats.Speed)
+	fmt.Println()
+	fmt.Printf("  %s  %s  %s\n",
+		colorize(bold, "Upload  "),
+		colorf(bold+green, "%.2f Mbps", stats.Speed),
+		colorf(dim, "(%.1f MB in %.1fs)", float64(stats.BytesSent)/(1000*1000), stats.Duration.Seconds()))
 	if stats.Error != nil {
-		fmt.Printf("Errors encountered: %v\n", stats.Error)
+		fmt.Printf("  %s %v\n", colorize(yellow, "!"), stats.Error)
 	}
-	fmt.Println(strings.Repeat("=", 50))
 }

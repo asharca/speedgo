@@ -97,7 +97,7 @@ func SelectBestServers(ctx context.Context, servers []TestServer, n int) []TestS
 		return nil
 	}
 
-	fmt.Printf("Probing %d servers for latency...\n", len(servers))
+	fmt.Printf("  %s\n", colorf(dim, "Probing %d servers...", len(servers)))
 	results := ProbeServers(ctx, servers, 5*time.Second)
 
 	var best []TestServer
@@ -108,12 +108,15 @@ func SelectBestServers(ctx context.Context, servers []TestServer, n int) []TestS
 		if r.Error != nil {
 			continue
 		}
-		fmt.Printf("  %-20s %v\n", r.Server.Name, r.Latency.Round(time.Millisecond))
+		ms := float64(r.Latency.Milliseconds())
+		fmt.Printf("    %s %s\n",
+			colorf(white, "%-18s", r.Server.Name),
+			colorf(rttColor(ms), "%dms", r.Latency.Milliseconds()))
 		best = append(best, r.Server)
 	}
 
 	if len(best) == 0 {
-		fmt.Println("  No servers reachable, using all as fallback")
+		fmt.Printf("  %s\n", colorize(yellow, "No servers reachable, using all as fallback"))
 		return servers
 	}
 

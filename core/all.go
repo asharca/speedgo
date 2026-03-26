@@ -29,13 +29,16 @@ func RunAll(ctx context.Context, args []string) error {
 		return fmt.Errorf("parsing config: %w", err)
 	}
 
-	fmt.Printf("Running full speed test (Region: %s)\n", config.Region)
-	fmt.Println(strings.Repeat("=", 50))
+	fmt.Println()
+	fmt.Printf("  %s  %s\n",
+		colorize(bold+cyan, "SpeedGo"),
+		colorf(dim, "region=%s", config.Region))
+	fmt.Printf("  %s\n", colorize(dim, strings.Repeat("─", 50)))
 
 	var results AllResults
 
 	// 1. Ping test
-	fmt.Println("\n[1/3] Latency Test")
+	fmt.Printf("\n  %s\n", colorf(bold, "[1/3] Latency"))
 	pingArgs := []string{
 		fmt.Sprintf("-region=%s", config.Region),
 		"-count=3",
@@ -43,14 +46,14 @@ func RunAll(ctx context.Context, args []string) error {
 	}
 	pingConfig, err := NewPingConfig(pingArgs)
 	if err != nil {
-		fmt.Printf("  Ping skipped: %v\n", err)
+		fmt.Printf("  %s %v\n", colorize(yellow, "!"), err)
 	} else {
 		results.PingResults = pingTargets(ctx, pingConfig)
 		printResults(results.PingResults)
 	}
 
 	// 2. Download test
-	fmt.Println("\n[2/3] Download Test")
+	fmt.Printf("\n  %s\n", colorf(bold, "[2/3] Download"))
 	dlArgs := []string{
 		fmt.Sprintf("-region=%s", config.Region),
 		"-duration=15s",
@@ -67,7 +70,7 @@ func RunAll(ctx context.Context, args []string) error {
 	printDownloadResults(results.DownloadStat)
 
 	// 3. Upload test
-	fmt.Println("\n[3/3] Upload Test")
+	fmt.Printf("\n  %s\n", colorf(bold, "[3/3] Upload"))
 	ulArgs := []string{
 		fmt.Sprintf("-region=%s", config.Region),
 		"-duration=10",
@@ -101,9 +104,22 @@ func parseAllConfig(args []string) (*AllConfig, error) {
 	}, nil
 }
 
+func speedRating(mbps float64) string {
+	switch {
+	case mbps >= 100:
+		return colorf(green, "%.2f Mbps", mbps)
+	case mbps >= 30:
+		return colorf(yellow, "%.2f Mbps", mbps)
+	default:
+		return colorf(red, "%.2f Mbps", mbps)
+	}
+}
+
 func printSummary(results AllResults) {
-	fmt.Printf("\n\nSPEED TEST SUMMARY\n")
-	fmt.Println(strings.Repeat("=", 50))
+	fmt.Println()
+	fmt.Printf("  %s\n", colorize(dim, strings.Repeat("─", 50)))
+	fmt.Printf("  %s\n", colorize(bold+cyan, "RESULTS"))
+	fmt.Println()
 
 	// Best ping
 	if len(results.PingResults) > 0 {
@@ -116,12 +132,20 @@ func printSummary(results AllResults) {
 			}
 		}
 		if bestPing > 0 {
-			fmt.Printf("  Latency:  %.1f ms (%s)\n",
-				float64(bestPing.Microseconds())/1000, bestTarget)
+			ms := float64(bestPing.Microseconds()) / 1000
+			fmt.Printf("  %s  %s  %s\n",
+				colorize(dim, "Latency "),
+				colorf(rttColor(ms)+bold, "%.1f ms", ms),
+				colorf(dim, "(%s)", bestTarget))
 		}
 	}
 
-	fmt.Printf("  Download: %.2f Mbps\n", results.DownloadStat.Speed)
-	fmt.Printf("  Upload:   %.2f Mbps\n", results.UploadStat.Speed)
-	fmt.Println(strings.Repeat("=", 50))
+	fmt.Printf("  %s  %s\n",
+		colorize(dim, "Download"),
+		colorize(bold, speedRating(results.DownloadStat.Speed)))
+	fmt.Printf("  %s  %s\n",
+		colorize(dim, "Upload  "),
+		colorize(bold, speedRating(results.UploadStat.Speed)))
+
+	fmt.Printf("\n  %s\n\n", colorize(dim, strings.Repeat("─", 50)))
 }
